@@ -178,6 +178,444 @@ COPY --from=builder /app/dist ./dist
 CMD ["node", "dist/index.js"]
 ```
 
+### React / Vite
+
+React applications built with Vite have specific requirements that differ from server-side Node.js apps. Vite generates static assets with content hashing, uses ES modules by default, and requires proper web server configuration to serve the SPA correctly.
+
+> **Key insight**: Unlike server-side Node.js apps, React/Vite apps only need Node.js for building—the runtime is just static files served by a web server like Nginx.
+
+#### Standard Multi-Stage Pattern
+
+```dockerfile
+# syntax=docker/dockerfile:1
+
+# Stage 1: Build
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Stage 2: Serve with Nginx
+FROM nginx:stable-alpine AS production
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+This pattern reduces image size from ~1GB (Node.js with dependencies) to ~50MB (Nginx Alpine with static files).
+
+#### Production Nginx Configuration
+
+Create `nginx.conf` with SPA routing, security headers, caching, and compression:
+
+```nginx
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Hide Nginx version
+    server_tokens off;
+
+    # SPA routing - serve index.html for all routes
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Cache hashed assets forever (Vite generates unique hashes)
+    location ~* \.(?:css|js)$ {
+        expires 1y;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # Cache static assets
+    location ~* \.(?:ico|gif|jpe?g|png|svg|woff2?|ttf|eot)$ {
+        expires 6M;
+        add_header Cache-Control "public, max-age=15552000";
+    }
+
+    # No cache for index.html (entry point must always be fresh)
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
+    }
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types text/plain text/css text/xml application/json application/javascript
+               application/xml+rss application/atom+xml image/svg+xml;
+
+    # Deny hidden files
+    location ~ /\. {
+        deny all;
+    }
+}
+```
+
+#### Running as Non-Root User (Recommended)
+
+For production security, run Nginx as a non-root user on a non-privileged port:
+
+```dockerfile
+# syntax=docker/dockerfile:1
+
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:stable-alpine AS production
+
+# Create nginx directories with correct permissions
+RUN mkdir -p /var/run/nginx && \
+    chown -R nginx:nginx /var/cache/nginx /var/run/nginx && \
+    chmod -R g+w /var/cache/nginx
+
+# Copy custom nginx config for non-root
+COPY nginx-main.conf /etc/nginx/nginx.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copy static files
+COPY --from=builder --chown=nginx:nginx /app/dist /usr/share/nginx/html
+
+USER nginx
+EXPOSE 8080
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+Create `nginx-main.conf` for non-root operation:
+
+```nginx
+worker_processes auto;
+pid /var/run/nginx/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    sendfile on;
+    keepalive_timeout 65;
+
+    include /etc/nginx/conf.d/*.conf;
+}
+```
+
+Update `nginx.conf` to listen on port 8080:
+
+```nginx
+server {
+    listen 8080;
+    # ... rest of config
+}
+```
+
+#### Build-Time Environment Variables
+
+Vite embeds environment variables at build time. Pass them via build arguments:
+
+```dockerfile
+FROM node:22-alpine AS builder
+WORKDIR /app
+
+# Accept build arguments
+ARG VITE_API_URL
+ARG VITE_APP_TITLE
+
+# Make available to Vite build
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_APP_TITLE=$VITE_APP_TITLE
+
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:stable-alpine AS production
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+Build with:
+
+```bash
+docker build \
+  --build-arg VITE_API_URL=https://api.example.com \
+  --build-arg VITE_APP_TITLE="My App" \
+  -t myapp:prod .
+```
+
+**Important**: All Vite environment variables must be prefixed with `VITE_`.
+
+#### Runtime Environment Variables (Advanced)
+
+For "build once, deploy anywhere" workflows, inject environment variables at container startup using placeholder substitution:
+
+**Step 1**: Create a config template (`public/config.js`):
+
+```javascript
+window.__ENV__ = {
+  VITE_API_URL: "__VITE_API_URL__",
+  VITE_FEATURE_FLAG: "__VITE_FEATURE_FLAG__"
+};
+```
+
+**Step 2**: Create an entrypoint script (`docker-entrypoint.sh`):
+
+```bash
+#!/bin/sh
+set -e
+
+# Replace placeholders with actual environment variables
+envsubst < /usr/share/nginx/html/config.js.template > /usr/share/nginx/html/config.js
+
+# Start nginx
+exec nginx -g "daemon off;"
+```
+
+**Step 3**: Update Dockerfile:
+
+```dockerfile
+FROM nginx:stable-alpine AS production
+RUN apk add --no-cache gettext
+
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY public/config.js /usr/share/nginx/html/config.js.template
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+RUN chmod +x /docker-entrypoint.sh
+
+EXPOSE 80
+ENTRYPOINT ["/docker-entrypoint.sh"]
+```
+
+**Step 4**: Access in your React app:
+
+```javascript
+const apiUrl = window.__ENV__?.VITE_API_URL || import.meta.env.VITE_API_URL;
+```
+
+#### Development vs Production Stages
+
+```dockerfile
+FROM node:22-alpine AS base
+WORKDIR /app
+COPY package*.json ./
+
+FROM base AS development
+RUN npm install
+COPY . .
+EXPOSE 5173
+CMD ["npm", "run", "dev", "--", "--host"]
+
+FROM base AS builder
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:stable-alpine AS production
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+```bash
+# Development with hot reload
+docker build --target development -t myapp:dev .
+docker run -p 5173:5173 -v $(pwd)/src:/app/src myapp:dev
+
+# Production
+docker build --target production -t myapp:prod .
+```
+
+#### Vite Configuration for Docker HMR
+
+When running Vite dev server inside Docker, configure `vite.config.ts` for proper hot module replacement:
+
+```typescript
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    host: '0.0.0.0',  // Listen on all interfaces
+    port: 5173,
+    watch: {
+      usePolling: true,  // Required for Docker file watching
+    },
+    hmr: {
+      host: 'localhost',  // Or your Docker host
+      port: 5173,
+    },
+  },
+});
+```
+
+**Note**: `usePolling: true` increases CPU usage but is required for reliable file change detection in Docker.
+
+#### Memory Optimization for Large Builds
+
+Node.js defaults to 512MB memory, which may be insufficient for large Vite builds:
+
+```dockerfile
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+
+# Increase Node.js memory limit for large builds
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+RUN npm run build
+```
+
+#### Pre-Compression with Brotli and Gzip
+
+For optimal performance, pre-compress assets during build:
+
+**Install Vite plugin** (`package.json`):
+
+```json
+{
+  "devDependencies": {
+    "vite-plugin-compression": "^0.5.1"
+  }
+}
+```
+
+**Configure Vite** (`vite.config.ts`):
+
+```typescript
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import viteCompression from 'vite-plugin-compression';
+
+export default defineConfig({
+  plugins: [
+    react(),
+    viteCompression({ algorithm: 'gzip' }),
+    viteCompression({ algorithm: 'brotliCompress', ext: '.br' }),
+  ],
+});
+```
+
+**Update Nginx** to serve pre-compressed files:
+
+```nginx
+server {
+    # ... other config
+
+    # Serve pre-compressed files if available
+    gzip_static on;
+
+    # For Brotli (requires ngx_brotli module or fholzer/nginx-brotli image)
+    # brotli_static on;
+}
+```
+
+#### Complete Production Example
+
+```dockerfile
+# syntax=docker/dockerfile:1
+
+ARG NODE_VERSION=22
+
+# Stage 1: Dependencies
+FROM node:${NODE_VERSION}-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
+
+# Stage 2: Build
+FROM node:${NODE_VERSION}-alpine AS builder
+WORKDIR /app
+
+# Build arguments for Vite
+ARG VITE_API_URL
+ARG VITE_APP_VERSION
+
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_APP_VERSION=$VITE_APP_VERSION
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
+
+# Stage 3: Production
+FROM nginx:stable-alpine AS production
+LABEL org.opencontainers.image.source="https://github.com/org/repo"
+LABEL org.opencontainers.image.description="Production React application"
+
+# Security: Create non-root setup
+RUN mkdir -p /var/run/nginx && \
+    chown -R nginx:nginx /var/cache/nginx /var/run/nginx /usr/share/nginx/html && \
+    chmod -R g+w /var/cache/nginx
+
+# Copy nginx configs
+COPY nginx-main.conf /etc/nginx/nginx.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copy static files
+COPY --from=builder --chown=nginx:nginx /app/dist /usr/share/nginx/html
+
+USER nginx
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+#### React/Vite-Specific .dockerignore
+
+```dockerignore
+node_modules
+npm-debug.log*
+dist
+build
+.git
+.gitignore
+*.md
+.env
+.env.*
+.vscode
+.idea
+coverage
+*.test.*
+*.spec.*
+__tests__
+Dockerfile*
+docker-compose*
+.dockerignore
+```
+
 ### Python
 
 ```dockerfile
@@ -959,3 +1397,45 @@ docker build --build-arg NODE_VERSION=20 .
 - [.NET 10 Container Updates Preview](https://github.com/dotnet/dotnet-docker/discussions/6324)
 - [Ubuntu Chiseled Images Documentation](https://github.com/dotnet/dotnet-docker/blob/main/documentation/ubuntu-chiseled.md)
 - [Azure Linux Distroless Images](https://github.com/dotnet/dotnet-docker/blob/main/documentation/azurelinux.md)
+
+### React / Vite Container Documentation
+- [Docker: How to Dockerize a React App](https://www.docker.com/blog/how-to-dockerize-react-app/)
+- [Docker: Containerize React Apps Guide](https://docs.docker.com/guides/reactjs/containerize/)
+- [Docker: Develop React Apps Guide](https://docs.docker.com/guides/reactjs/develop/)
+- [React Vite + Docker + Nginx Production Guide](https://www.buildwithmatija.com/blog/production-react-vite-docker-deployment)
+- [Building a Production Docker Container for Vite + React Apps](https://alvincrespo.hashnode.dev/react-vite-production-ready-docker)
+- [Guide to Containerizing a Modern JavaScript SPA with Multi-Stage Nginx Build](https://dev.to/it-wibrc/guide-to-containerizing-a-modern-javascript-spa-vuevitereact-with-a-multi-stage-nginx-build-1lma)
+- [Production Multistage Dockerfile For React Application](https://dev.to/sre_panchanan/production-multistage-dockerfile-for-react-application-2p6i)
+- [Optimizing Docker Builds: Multi-Stage Builds with React and Vite](https://medium.com/@ryanmambou/optimizing-docker-builds-a-practical-guide-to-multi-stage-builds-with-react-and-vite-c9692414961c)
+- [Dockerizing the Frontend with React.js + Vite](https://www.innokrea.com/dockerizing-the-frontend-do-it-right-with-react-js-vite/)
+
+### Vite Environment Variables
+- [Vite: Env Variables and Modes](https://vite.dev/guide/env-and-mode)
+- [Managing Runtime Environment Variables in Vite, Docker, and React](https://www.mykolaaleksandrov.dev/posts/2025/10/vite-docker-react-environment-variables/)
+- [Runtime ENV Config for Vite: Build Once, Deploy Anywhere](https://engineering.simpl.de/post/runtime-env-config-part1/)
+- [Setting Up Dynamic Environment Variables with Vite and Docker](https://dev.to/dutchskull/setting-up-dynamic-environment-variables-with-vite-and-docker-5cmj)
+- [vite-envs: Env Variables at Container Startup](https://github.com/garronej/vite-envs)
+
+### Vite Docker Development (HMR)
+- [ViteJS Hot Reload in Docker Container](https://patrickdesjardins.com/blog/docker-vitejs-hot-reload)
+- [Vite Docker HMR Guide](https://www.restack.io/p/vite-answer-docker-hmr-guide)
+- [Enabling HMR in Vite with NGINX Reverse Proxy](https://aronschueler.de/blog/2024/07/29/enabling-hot-module-replacement-hmr-in-vite-with-nginx-reverse-proxy/)
+- [Vite Performance Guide](https://vite.dev/guide/performance)
+
+### Nginx Caching and Compression
+- [NGINX Browser Caching Guide](https://www.getpagespeed.com/server-setup/nginx/nginx-browser-caching)
+- [Vite PWA NGINX Deployment](https://vite-pwa-org.netlify.app/deployment/nginx)
+- [Pre-compress Static Assets with Brotli and Gzip](https://erikpoehler.com/2021/05/24/pre-compress-static-assets-with-brotli-or-gzip/)
+- [Enable GZIP and Brotli Compression for Nginx](https://computingforgeeks.com/how-to-enable-gzip-brotli-compression-for-nginx-on-linux/)
+- [Brotli Compression in React Apps](https://engineering.brevo.com/brotli-compression-in-react-apps/)
+
+### Security Headers
+- [Content-Security-Policy Headers on Nginx](https://content-security-policy.com/examples/nginx/)
+- [React Content Security Policy Guide](https://www.stackhawk.com/blog/react-content-security-policy-guide-what-it-is-and-how-to-enable-it/)
+- [MDN: Content-Security-Policy Header](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy)
+- [React CSP with Nonce](https://www.hectane.com/blog/react-content-security-policy-webpack-node-nginx)
+
+### Build Optimization
+- [Avoiding Memory Issues During Docker-Vite-React Builds](https://joetatusko.com/2024/10/18/avoiding-memory-issues-during-docker-vite-react-builds/)
+- [Optimized Docker Setup for Vite-Powered React Apps](https://medium.com/@pierre.fourny/optimized-docker-setup-for-vite-powered-react-apps-e7b7f5a82bb4)
+- [Optimize Vite Build Time Guide](https://dev.to/perisicnikola37/optimize-vite-build-time-a-comprehensive-guide-4c99)
