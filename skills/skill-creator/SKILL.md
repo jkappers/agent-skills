@@ -237,20 +237,9 @@ Review pull request $ARGUMENTS.
 
 Positional arguments: `$0`, `$1`, `$2` or `$ARGUMENTS[0]`, `$ARGUMENTS[1]`.
 
-Dynamic context injection with `` !`command` ``:
+Dynamic context injection runs shell commands and inserts output before the model sees the content. Prefix a backtick-wrapped command with the bang character (the exclamation mark).
 
-```yaml
----
-name: pr-summary
-context: fork
-agent: Explore
----
-## Context
-- Diff: !`gh pr diff`
-- Files: !`gh pr diff --name-only`
-
-Summarize this pull request.
-```
+For complete syntax reference and a working example, see [references/frontmatter.md](references/frontmatter.md#string-substitutions).
 
 Other platforms may define their own extensions. Consult the target platform's documentation for available fields.
 

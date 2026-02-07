@@ -144,24 +144,14 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 | `$ARGUMENTS` | All arguments passed when invoking the skill |
 | `$ARGUMENTS[N]` / `$N` | Specific argument by 0-based index |
 | `${CLAUDE_SESSION_ID}` | Current session ID |
-| `` !`command` `` | Execute shell command, replace with output (runs before Claude sees content) |
+| Bang + backtick-wrapped command | Execute shell command, replace with output (runs before Claude sees content) |
 
 #### Dynamic Context Example
 
-```yaml
----
-name: review-changes
-description: Review uncommitted changes against project standards
-context: fork
-agent: Explore
----
-## Current Changes
-- Staged diff: !`git diff --cached`
-- Unstaged diff: !`git diff`
-- Status: !`git status --short`
+To inject shell command output into skill content, prefix a backtick-wrapped command with the bang character. For example, a review-changes skill could include lines like:
 
-Review these changes for:
-1. Code quality issues
-2. Missing tests
-3. Breaking changes
-```
+- `Staged diff:` followed by a bang-prefixed backtick command running `git diff --cached`
+- `Unstaged diff:` followed by a bang-prefixed backtick command running `git diff`
+- `Status:` followed by a bang-prefixed backtick command running `git status --short`
+
+These commands execute before the model sees the content, replacing each bang-backtick expression with the command's stdout.
