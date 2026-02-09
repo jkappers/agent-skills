@@ -1,15 +1,29 @@
 ---
 name: conventional-commit
 description: Conventional Commits v1.0.0 standards for git messages. Use when (1) creating git commits, (2) writing or drafting commit messages, (3) reviewing commit message format, (4) explaining commit conventions, or (5) validating commit message compliance.
+argument-hint: "[commit message or description of changes]"
 ---
 
 # Commit Authoring
 
-Write commit messages following Conventional Commits v1.0.0.
+Create git commits following Conventional Commits v1.0.0.
+
+When invoked with arguments, commit staged changes with a message for: $ARGUMENTS
+
+This skill applies only to git commit messages. Do not apply these conventions to PR titles, branch names, changelog entries, or release notes unless explicitly requested.
+
+## Workflow
+
+1. Run `git diff --cached` to inspect staged changes
+2. If no staged changes exist, report this and stop
+3. Analyze the diff to determine the appropriate type, scope, and description
+4. Compose the commit message following the rules below
+5. Run `git commit -m "<message>"` (use a HEREDOC for multi-line messages)
+6. Do not stage files. Only commit what is already staged.
 
 ## Message Structure
 
-```
+```text
 <type>[optional scope]: <description>
 
 [optional body]
@@ -17,66 +31,78 @@ Write commit messages following Conventional Commits v1.0.0.
 [optional footer(s)]
 ```
 
-## Rules
-
-1. Prefix with type, optional scope in parentheses, optional `!` for breaking changes, colon, space
-2. `feat` for new features (MINOR in SemVer)
-3. `fix` for bug fixes (PATCH in SemVer)
-4. Description immediately follows the colon and space
-5. Body separated by one blank line, free-form
-6. Footers one blank line after body, token-separator-value format
-7. Footer tokens use `-` instead of spaces (except `BREAKING CHANGE`)
-8. `!` before `:` indicates breaking change; `BREAKING CHANGE:` footer may be omitted if `!` is used
-9. Breaking changes correlate with MAJOR in SemVer
-
 ## Types
 
-| Type | Purpose | SemVer |
-|------|---------|--------|
-| `feat` | New feature | MINOR |
-| `fix` | Bug fix | PATCH |
-| `docs` | Documentation only | - |
-| `style` | Formatting, whitespace | - |
-| `refactor` | Neither fix nor feature | - |
-| `perf` | Performance improvement | - |
-| `test` | Adding or updating tests | - |
-| `build` | Build system or dependencies | - |
-| `ci` | CI configuration | - |
-| `chore` | Maintenance tasks | - |
+| Type | Purpose |
+|------|---------|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `docs` | Documentation only |
+| `style` | Formatting, whitespace |
+| `refactor` | Neither fix nor feature |
+| `perf` | Performance improvement |
+| `test` | Adding or updating tests |
+| `build` | Build system or dependencies |
+| `ci` | CI configuration |
+| `chore` | Maintenance tasks |
+
+## Scopes
+
+Scope is optional. When used, set it to the module, component, or area of the codebase affected.
+
+Derive scopes from the project structure. Use directory names or module names, not file names.
+
+Examples: `feat(auth):`, `fix(api):`, `docs(readme):`, `refactor(db):`
+
+Omit scope when the change is cross-cutting or affects the project root.
 
 ## Description
 
-Use imperative mood: "add feature" not "added feature". Keep under 50 characters. No period. Lowercase after type prefix.
+Use imperative mood: "add feature" not "added feature" or "adds feature".
+Lowercase the first letter after the type prefix.
+Omit trailing period.
+Limit to 50 characters.
 
 ## Body
 
-Wrap at 72 characters. Explain what and why, not how.
+Wrap at 72 characters. Explain what changed and why, not how.
 
-## Prohibited
+Separate the body from the description with one blank line.
 
-Do not include "Generated with Claude Code", AI attribution, Co-authored-by lines for AI, emoji, time estimates, dates, or TODO items.
+Use the body for context the diff alone does not convey: motivation, trade-offs, or constraints that influenced the approach.
+
+## Prohibited Content
+
+Do not include any of the following in commit messages:
+
+- AI attribution ("Generated with Claude Code", "Co-authored-by" lines for AI)
+- Emoji in type prefixes or descriptions
+- Time estimates or dates
+- TODO items or future work references
+- File lists (the diff already shows what changed)
+- Apologies or hedging ("try to fix", "hopefully resolves")
 
 ## Examples
 
 Simple:
-```
+```text
 docs: correct spelling of CHANGELOG
 ```
 
 With scope:
-```
+```text
 feat(lang): add Polish language
 ```
 
 Breaking change:
-```
+```text
 feat!: send email to customer when product ships
 
 BREAKING CHANGE: customers now receive emails by default.
 ```
 
 With body:
-```
+```text
 fix: prevent duplicate form submissions
 
 Disables submit button after first click and adds
@@ -84,7 +110,7 @@ debounce to the handler.
 ```
 
 With footer:
-```
+```text
 fix: resolve race condition in auth flow
 
 Refs: #123
