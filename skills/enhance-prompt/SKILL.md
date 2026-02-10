@@ -15,27 +15,13 @@ When invoked with input:
 1. **Classify the request**: Determine if the input is a prompt to review, a description of a prompt to write, or a general prompt engineering question
 2. **Analyze**: For existing prompts, identify violations of the principles below. For new prompts, gather requirements
 3. **Apply principles**: Apply Token Economics, Determinism, Imperative Language, Formatting, and Anti-Pattern checks
-4. **Produce output**: Return the result in the output format below
-
-When invoked without input, serve as a reference guide for the principles below.
+4. **Produce output**: Return the enhanced prompt only
 
 ## Output Format
 
-For prompt reviews, structure feedback as:
+Return the enhanced prompt only. No preamble, no violation notes, no commentary, no explanations. The entire response is the improved prompt, ready to copy and paste.
 
-```markdown
-## Prompt Review
-
-### Violations Found
-| Line/Section | Issue | Severity | Fix |
-|-------------|-------|----------|-----|
-| [location] | [what's wrong] | High/Medium/Low | [specific rewrite] |
-
-### Rewritten Prompt
-[Complete improved version if requested, or key sections rewritten]
-```
-
-For new prompt creation, deliver the prompt directly with inline comments explaining key decisions.
+When invoked without input, serve as a reference guide for the principles below.
 
 ## Token Economics
 
