@@ -1,19 +1,49 @@
 ---
 name: enhance-prompt
-description: Use when writing, reviewing, or improving any LLM prompt or AI agent instructions. Invoke for system prompts, Claude Code skills, CLAUDE.md files, rules, slash commands, or general prompt engineering questions. Covers token economics, imperative language, determinism, formatting, emphasis modifiers, and anti-patterns. Applies to all LLM platforms (Claude, GPT, Gemini, Llama).
+description: Analyzes and improves LLM prompts and agent instructions for token efficiency, determinism, and clarity. Use when (1) writing a new system prompt, skill, or CLAUDE.md file, (2) reviewing or improving an existing prompt for clarity and efficiency, (3) diagnosing why a prompt produces inconsistent or unexpected results, (4) converting natural language instructions into imperative LLM directives, or (5) evaluating prompt anti-patterns and suggesting fixes. Applies to all LLM platforms (Claude, GPT, Gemini, Llama).
+argument-hint: "[prompt text, file path, or description of what to write]"
 ---
 
-# Instruction Authoring Foundations
+# Prompt Enhancement
 
-Core principles for writing instructions that LLMs execute efficiently and deterministically. Apply these principles to system prompts, agent instructions, skills, CLAUDE.md files, rules, slash commands, and any LLM prompt across platforms.
+Analyze, write, and improve LLM prompts and agent instructions. Apply these principles to system prompts, agent instructions, skills, CLAUDE.md files, rules, slash commands, and any LLM prompt.
+
+## Workflow
+
+When invoked with input:
+
+1. **Classify the request**: Determine if the input is a prompt to review, a description of a prompt to write, or a general prompt engineering question
+2. **Analyze**: For existing prompts, identify violations of the principles below. For new prompts, gather requirements
+3. **Apply principles**: Apply Token Economics, Determinism, Imperative Language, Formatting, and Anti-Pattern checks
+4. **Produce output**: Return the result in the output format below
+
+When invoked without input, serve as a reference guide for the principles below.
+
+## Output Format
+
+For prompt reviews, structure feedback as:
+
+```markdown
+## Prompt Review
+
+### Violations Found
+| Line/Section | Issue | Severity | Fix |
+|-------------|-------|----------|-----|
+| [location] | [what's wrong] | High/Medium/Low | [specific rewrite] |
+
+### Rewritten Prompt
+[Complete improved version if requested, or key sections rewritten]
+```
+
+For new prompt creation, deliver the prompt directly with inline comments explaining key decisions.
 
 ## Token Economics
 
-The context window is a shared resource. Challenge each piece of information: "Does the model already know this?" Only add context the model lacks. Assume the model is already very capable.
+The context window is a shared resource. Challenge each piece of information: "Does the model already know this?" Only add context the model lacks. Assume high baseline capability.
 
 Remove decorative language. No "please", "remember", "make sure", "it's important".
 
-Use examples over explanations. One concrete before/after example teaches more than three paragraphs of description.
+Use examples over explanations. One concrete before/after pair teaches more than three paragraphs of description.
 
 Prefer tables for structured data. Compress related information into scannable format.
 
@@ -52,10 +82,7 @@ Write direct commands in imperative mood.
 Good: "Validate input at API boundaries"
 Avoid: "You should consider validating input"
 
-State what to do, not what not to do when possible.
-
-Good: "Let exceptions propagate"
-Avoid: "Do not catch exceptions unnecessarily"
+Prefer positive instructions over negations. "Let exceptions propagate" rather than "Do not catch exceptions unnecessarily."
 
 ### Specificity in Constraints
 
@@ -68,25 +95,15 @@ Avoid: "Avoid defensive patterns"
 
 Use markdown structure that aids LLM understanding.
 
-**Headings**: Establish context and scope. Content under a heading applies to that domain only.
-
-**Lists**: Use only for discrete, parallel, independent items. Use prose when relationships between ideas matter.
-
-**Code blocks**: For exact values, commands, identifiers, and patterns only.
-
-**Tables**: For structured comparisons, reference data, or multi-dimensional information.
-
-**Bold/Italic**: Use sparingly. If more than 10% of text is emphasized, nothing is emphasized.
-
-**White space**: Use blank lines between paragraphs and sections for clarity. Aids parsing.
-
-### Tables vs Lists vs Prose
-
-**Tables**: Structured data with categories - types, priorities, mappings, decision matrices.
-
-**Lists**: Discrete, parallel items - required packages, file paths, command flags.
-
-**Prose**: Relationships and context - when to use one approach vs another, why a constraint exists.
+| Format | Purpose |
+|--------|---------|
+| **Headings** | Establish context and scope boundaries |
+| **Lists** | Discrete, parallel, independent items only |
+| **Code blocks** | Exact values, commands, identifiers, patterns |
+| **Tables** | Structured comparisons, reference data, decision matrices |
+| **Bold** | Hard constraints where violation causes failure (max 10% of content) |
+| **Prose** | Relationships between ideas, conditional logic, rationale |
+| **White space** | Blank lines between paragraphs and sections for parsing clarity |
 
 ## Emphasis and Terminology
 
@@ -96,14 +113,12 @@ Use MUST, MUST NOT, REQUIRED only for hard constraints where violation causes fa
 
 Do not use modifiers for preferences or defaults. If every instruction uses MUST, none stand out.
 
-Bold only for hard constraints where violation causes failure. Avoid over-emphasis.
-
 ### Terminology Consistency
 
 Choose one term per concept and use it throughout.
 
 Good: Always "API endpoint"
-Bad: Mix "API endpoint", "URL", "route", "path"
+Avoid: Alternating "API endpoint", "URL", "route", "path"
 
 ## Structural Optimization
 
@@ -120,48 +135,48 @@ End sections decisively. No trailing "etc." or "and more."
 ### Language Anti-Patterns
 
 Suggestion language:
-- ❌ "Consider using async/await"
-- ✓ "Use async/await for I/O operations"
+- Avoid: "Consider using async/await"
+- Good: "Use async/await for I/O operations"
 
 Vague quantifiers:
-- ❌ "Usually validate input"
-- ✓ "Validate input at API boundaries"
+- Avoid: "Usually validate input"
+- Good: "Validate input at API boundaries"
 
 Ambiguous conditionals:
-- ❌ "Add logging when appropriate"
-- ✓ "Log errors with stack traces. Omit logging for expected control flow."
+- Avoid: "Add logging when appropriate"
+- Good: "Log errors with stack traces. Omit logging for expected control flow."
 
 Multiple options without default:
-- ❌ "Use Jest, Vitest, or Mocha for testing"
-- ✓ "Use Vitest for tests. Jest acceptable for legacy files."
+- Avoid: "Use Jest, Vitest, or Mocha for testing"
+- Good: "Use Vitest for tests. Jest acceptable for legacy files."
 
 ### Structural Anti-Patterns
 
 Burying critical constraints:
-- ❌ Long preamble, then critical requirement in middle
-- ✓ Critical requirement first, context after if needed
+- Avoid: Long preamble, then critical requirement in middle
+- Good: Critical requirement first, context after if needed
 
 Over-emphasis:
-- ❌ **Every** **other** **word** **bold**
-- ✓ Bold only for hard constraints where violation causes failure
+- Avoid: **Every** **other** **word** **bold**
+- Good: Bold only for hard constraints where violation causes failure
 
 Lists as default:
-- ❌ Everything formatted as bulleted list
-- ✓ Lists for discrete items, prose for relationships
+- Avoid: Everything formatted as bulleted list
+- Good: Lists for discrete items, prose for relationships
 
 ### Content Anti-Patterns
 
 Repeating framework documentation:
-- ❌ "React hooks let you use state and lifecycle in function components..."
-- ✓ "Store form state in URL params, not local state"
+- Avoid: "React hooks let you use state and lifecycle in function components..."
+- Good: "Store form state in URL params, not local state"
 
 Generic best practices:
-- ❌ "Functions should be small and focused"
-- ✓ "Limit API handlers to routing only. Move logic to services/"
+- Avoid: "Functions should be small and focused"
+- Good: "Limit API handlers to routing only. Move logic to services/"
 
 Time-sensitive information:
-- ❌ "Before August 2025, use legacy API"
-- ✓ "Use v2 API at api.example.com/v2/"
+- Avoid: "Before August 2025, use legacy API"
+- Good: "Use v2 API at api.example.com/v2/"
 
 Decorative content: Welcome messages, motivational statements, background history.
 
