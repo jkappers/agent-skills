@@ -12,10 +12,11 @@ When invoked with arguments, write a spec for: $ARGUMENTS
 
 ## Workflow
 
-1. Create directory: `specs/feature-name/`
-2. Copy `templates/spec.md` to `specs/feature-name/README.md`
-3. Complete every section from the Required Sections table below
-4. Validate against the checklist before completing
+1. Gather context: Collect feature description, target users, problem statement, and constraints from user input or $ARGUMENTS. Ask clarifying questions for missing information.
+2. Create directory: `specs/feature-name/`
+3. Copy `assets/spec.md` to `specs/feature-name/README.md`
+4. Complete every section from the Required Sections table below
+5. Validate against the checklist before completing
 
 ## Required Sections
 
@@ -32,7 +33,7 @@ When invoked with arguments, write a spec for: $ARGUMENTS
 
 ## Acceptance Criteria
 
-```
+```markdown
 - [ ] Given [context], when [action], then [expected result]
 ```
 
@@ -63,5 +64,5 @@ A spec defines WHAT to build, not HOW to build it. Exclude:
 
 ## Supporting Files
 
-- `templates/spec.md` - Spec template
-- `references/spec-guide.md` - Extended guidance on document boundaries, naming, and ADRs
+- `assets/spec.md` - Spec template
+- `references/spec-guide.md` - Extended guidance on ADRs and archival

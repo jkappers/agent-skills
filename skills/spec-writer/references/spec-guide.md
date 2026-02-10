@@ -6,24 +6,7 @@ Extended guidance for feature specifications. See SKILL.md for core rules.
 
 ## Document Boundary
 
-A spec captures WHAT and WHY — never HOW. Do not prescribe implementation approach, technology choices, or technical strategy.
-
-**Must not appear in a spec:** Implementation approach, architecture diagrams, code examples, database schemas, API signatures, technology choices, performance specifications.
-
----
-
-## File Naming
-
-**Rules:**
-- Always use hyphens (never underscores)
-- Always use lowercase
-- Use descriptive names (not abbreviations)
-
-**Spec directory pattern:** `specs/feature-name/`
-
-Examples:
-- `specs/user-notifications/`
-- `specs/payment-integration/`
+See the Exclusions section in SKILL.md for the complete list.
 
 ---
 
