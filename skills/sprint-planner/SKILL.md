@@ -16,6 +16,18 @@ Decompose complex implementation plans into focused, autonomous agent sprints. E
 
 When invoked with arguments, decompose: $ARGUMENTS
 
+## When to Use
+
+| Plan Characteristics | Action |
+|----------------------|--------|
+| >15 discrete steps or >8K tokens | Decompose into sprints |
+| Cross-domain work (multiple categories, services, or layers) | Decompose into sprints |
+| Long-running work requiring checkpoints | Decompose into sprints |
+| <10 steps, single domain, clear scope | Execute directly — decomposition adds overhead |
+| Exploratory or research work | Execute directly — fluid reasoning needs cross-domain context |
+
+When uncertain, decompose. The cost of unnecessary decomposition is low; the cost of context collapse mid-execution is high.
+
 ## Workflow
 
 1. **Load the plan** — Read the plan from the argument path or user input. If the input is a description rather than a file, ask for the full plan or spec location.
@@ -37,6 +49,7 @@ Every sprint **MUST** satisfy:
 | Acceptance criteria | 3-5 verifiable checks with measurable outcomes |
 | Dependencies | Explicitly listed by sprint ID |
 | Autonomy | Executable without human intervention |
+| Token budget | Sprint definition fits in <2K input tokens (scope + criteria + constraints + references) |
 
 ## Sprint Structure
 
@@ -54,6 +67,7 @@ Every sprint defines these fields:
 | `acceptance_criteria` | 3-5 verifiable checks (see format below) |
 | `constraints` | Explicit prohibitions — what NOT to do |
 | `reference_material` | File path + line range or section name. Never paste full source |
+| `style_anchor` | Path to shared conventions doc (naming, patterns, structure). All sprints reference the same anchor to prevent drift |
 
 ## Acceptance Criteria Format
 
@@ -82,10 +96,16 @@ Use measurable, deterministic checks. **Never** use "code looks good", "follows 
 - Group by feature or category to reduce context switching
 - Isolate complex work into dedicated sprints
 - Never mix setup and implementation in the same sprint
+- Design each sprint to be independently re-executable from its `input_state` — if a sprint fails, it can be re-run without repeating prior sprints
 
 ## Context Minimization
 
-Provide only what the sprint needs. Reference the full plan by file path — do not repeat content.
+LLM performance degrades 30-40% when sprint context exceeds ~2K tokens, and information placed mid-context is used 30-60% less effectively than information at the start or end. Minimize each sprint definition to only what execution requires.
+
+**Rules:**
+- Reference the full plan by file path — do not paste content inline
+- Order fields so acceptance criteria and constraints appear before reference material — critical information must not be buried at the end
+- Target <2K tokens per sprint definition (scope + criteria + constraints + references combined)
 
 ```yaml
 # Correct
@@ -117,6 +137,7 @@ Write the sprint plan as YAML using [`assets/sprint-template.yaml`](assets/sprin
 
 After the sprint definitions, append:
 - **Execution Protocol** from [`references/execution-protocol.md`](references/execution-protocol.md)
+- **Verification Gate** from [`references/execution-protocol.md`](references/execution-protocol.md)
 - **Rollback Procedures** from [`references/execution-protocol.md`](references/execution-protocol.md)
 
 See [`references/example.md`](references/example.md) for a complete 43-endpoint migration decomposed into 7 sprints.
@@ -127,8 +148,12 @@ See [`references/example.md`](references/example.md) for a complete 43-endpoint 
 - [ ] No criterion uses subjective language
 - [ ] All dependencies are explicitly declared
 - [ ] No sprint exceeds 4 hours or 6 items
+- [ ] Each sprint definition fits within ~2K input tokens
 - [ ] Reference materials use file paths, not inline content
+- [ ] Acceptance criteria and constraints appear before reference material in each sprint
 - [ ] Dependency chain accounts for all sprints
 - [ ] Independent sprints are marked for parallel execution
 - [ ] Constraints specify what NOT to do, not just what to do
 - [ ] Input and output states are concrete and verifiable
+- [ ] Each sprint is independently re-executable from its `input_state`
+- [ ] A `style_anchor` is defined when the plan spans multiple sprints with shared conventions

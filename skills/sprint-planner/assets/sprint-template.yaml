@@ -5,6 +5,7 @@ estimated_hours: 0  # Sum of all sprint durations
 success_metric: "[How to verify overall completion]"
 
 dependency_chain: "1 → 2, 3 → 4, 5 → 6 → 7"
+style_anchor: "path/to/conventions.md"  # Shared naming, patterns, and structure rules. All sprints reference this.
 
 sprints:
   - sprint_id: 1
