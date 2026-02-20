@@ -17,7 +17,7 @@ compatibility: Requires acli (Atlassian CLI) and git
 Ticket ID: $ARGUMENTS
 
 Ticket details:
-!`acli jira workitem view $ARGUMENTS`
+`acli jira workitem view $ARGUMENTS`
 
 ## Workflow
 
