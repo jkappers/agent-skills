@@ -1,5 +1,5 @@
 ---
-name: jira-ticket
+name: plan-jira-ticket
 description: >
   Fetches a Jira ticket and starts implementation with a branch and plan.
   Use when (1) starting work on a Jira ticket,
@@ -12,7 +12,7 @@ disable-model-invocation: true
 compatibility: Requires acli (Atlassian CLI) and git
 ---
 
-# Jira Ticket
+# Plan Jira Ticket
 
 Ticket ID: $ARGUMENTS
 
