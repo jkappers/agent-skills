@@ -10,16 +10,20 @@ Read, optimize, and rewrite markdown documents for token efficiency, structural 
 
 ## Workflow
 
-1. **Read the file** at the provided path. If no path is provided, ask for one
+1. **Read** the file at `$ARGUMENTS`. If no path is provided, ask for one
 2. **Analyze** the document for optimization opportunities using the principles below
 3. **Rewrite** the file in place with all optimizations applied
-4. **Report** a brief summary: original line count, new line count, and key changes made
+4. **Verify** the rewritten document preserves all factual content and meaning from the original
+5. **Report** using this format:
+
+> Original: [N] lines → Optimized: [N] lines ([N]% reduction)
+> Changes: [comma-separated list of key changes]
 
 ## Optimization Principles
 
 ### Token Economics
 
-Challenge every sentence: "Does this earn its tokens?" Remove content that restates common knowledge, repeats itself, or adds no actionable value.
+Evaluate each sentence for token value. Remove content that restates common knowledge, repeats itself, or adds no actionable value.
 
 Remove decorative language. No "please note", "it's worth mentioning", "remember that", "importantly".
 
@@ -59,7 +63,8 @@ Remove redundant qualifiers:
 
 ### Content Filtering
 
-**Remove entirely:**
+#### Remove Entirely
+
 - Welcome messages, introductions, background history
 - Motivational statements ("This will help you write better code!")
 - Content the model already knows (framework basics, language syntax)
@@ -67,7 +72,8 @@ Remove redundant qualifiers:
 - Time-sensitive references without dates
 - Redundant examples that demonstrate the same concept
 
-**Preserve:**
+#### Preserve
+
 - Domain-specific knowledge the model lacks
 - Concrete examples demonstrating non-obvious patterns
 - Decision criteria and trade-off analysis
@@ -101,3 +107,11 @@ Identify synonyms used for the same concept. Choose the most precise term and us
 - **Do not add new content.** Optimization removes and restructures; it does not invent
 - **Do not add commentary or annotations** to the output file
 - Write the optimized document directly to the source file
+
+## Scope Boundaries
+
+Do not use for:
+- Non-markdown files
+- Documents requiring content creation or expansion
+- Files already optimized by a previous run
+- Code files or config files with markdown comments
